@@ -2,6 +2,10 @@
 # 1, @weixin_message: 获取微信所有参数.
 # 2, @weixin_public_account: 如果配置了public_account_class选项,则会返回当前实例,否则返回nil.
 # 3, @keyword: 目前微信只有这三种情况存在关键字: 文本消息, 事件推送, 接收语音识别结果
+
+require 'net/http'
+require 'json'
+
 WeixinRailsMiddleware::WeixinController.class_eval do
 
   def reply
@@ -10,8 +14,48 @@ WeixinRailsMiddleware::WeixinController.class_eval do
 
   private
 
+    def find_result(text)
+      base_url = "http://fanyi.youdao.com/openapi.do?keyfrom=weixin-dict&key=1984702399&type=data&doctype=json&version=1.1&q="
+      url = URI(base_url + text)
+      res = Net::HTTP.get(url)
+      JSON.parse(res)
+    end
+
+    def format_result(result)
+      nice_res = ""
+      nice_res = "您想要查询：#{@keyword}\n" +
+      "~~~~~~~~~~~~~~~~\n" +
+      "结果:\n" +
+      "翻译：#{result["translation"].first}\n" +
+      "----------\n" +
+      "字典：\n"
+      result["basic"]["explains"].each do |r|
+        nice_res += "\t - #{r}\n"
+      end
+
+      nice_res += "----------\n"
+      nice_res += "发音："
+      nice_res += "\t - us: #{result["basic"]["us-phonetic"]}"
+      nice_res += "\t - uk: #{result["basic"]["uk-phonetic"]}\n"
+
+      nice_res += "----------\n"
+      nice_res += "网络：\n"
+      result["web"].each do |item|
+        nice_res += " #{item["key"]}：\n"
+        nice_res += "\t"
+        item["value"].each do |r|
+          nice_res += "#{r} "
+        end
+
+        nice_res += "\n"
+      end
+
+      nice_res
+    end
+
     def response_text_message(options={})
-      reply_text_message("Your Message: #{@keyword}")
+      result = find_result(@keyword)
+      reply_text_message(format_result(result))
     end
 
     # <Location_X>23.134521</Location_X>
