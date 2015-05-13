@@ -19,7 +19,7 @@ WeixinRailsMiddleware::WeixinController.class_eval do
       url = URI(URI::escape(base_url + text))
       res = Net::HTTP.get(url)
       result = JSON.parse(res)
-      if result["basic"] == nil
+      if result["basic"] == nil || result["web"] == nil
         result = nil
       else
         result
@@ -67,12 +67,44 @@ WeixinRailsMiddleware::WeixinController.class_eval do
       end
     end
 
+    def format_chi_result(result)
+      if result
+        nice_res = ""
+        nice_res = "您想要查询：#{@keyword}\n" +
+          "----------------\n" +
+          "结果:\n" +
+          "翻译：#{result["translation"].first}\n"+
+          "----------\n" +
+          "字典：\n"
+
+        result["basic"]["explains"].each do |r|
+          nice_res += "\t - #{r}\n"
+        end
+
+        nice_res += "----------\n"
+        nice_res += "发音：\n"
+        nice_res += "\t #{result["basic"]["phonetic"]}\n"
+
+        nice_res += "----------\n"
+        nice_res += "网络：\n"
+        result["web"].each do |item|
+          nice_res += " #{item["key"]}：\n"
+          nice_res += "\t"
+          item["value"].each do |r|
+            nice_res += "#{r} "
+          end
+
+          nice_res += "\n"
+        end
+        nice_res
+      end
+    end
 
     def response_text_message(options={})
       result = find_result(@keyword)
       if result
         if is_chinese?(@keyword)
-          reply_text_message("It's chinese")
+          reply_text_message(format_chi_result(result))
         else
           reply_text_message(format_eng_result(result))
         end
