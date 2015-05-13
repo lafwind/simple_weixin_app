@@ -16,46 +16,69 @@ WeixinRailsMiddleware::WeixinController.class_eval do
 
     def find_result(text)
       base_url = "http://fanyi.youdao.com/openapi.do?keyfrom=weixin-dict&key=1984702399&type=data&doctype=json&version=1.1&q="
-      url = URI(base_url + text)
+      url = URI(URI::escape(base_url + text))
       res = Net::HTTP.get(url)
-      JSON.parse(res)
+      result = JSON.parse(res)
+      if result["basic"] == nil
+        result = nil
+      else
+        result
+      end
     end
 
-    def format_result(result)
-      nice_res = ""
-      nice_res = "您想要查询：#{@keyword}\n" +
-      "~~~~~~~~~~~~~~~~\n" +
-      "结果:\n" +
-      "翻译：#{result["translation"].first}\n" +
-      "----------\n" +
-      "字典：\n"
-      result["basic"]["explains"].each do |r|
-        nice_res += "\t - #{r}\n"
+    def is_chinese?(str)
+      str.each_char do |char|
+        return false if ("a".."z") === char || ("A".."Z") === char || ("1".."9") === char
       end
+      true
+    end
 
-      nice_res += "----------\n"
-      nice_res += "发音："
-      nice_res += "\t - us: #{result["basic"]["us-phonetic"]}"
-      nice_res += "\t - uk: #{result["basic"]["uk-phonetic"]}\n"
-
-      nice_res += "----------\n"
-      nice_res += "网络：\n"
-      result["web"].each do |item|
-        nice_res += " #{item["key"]}：\n"
-        nice_res += "\t"
-        item["value"].each do |r|
-          nice_res += "#{r} "
+    def format_eng_result(result)
+      if result
+        nice_res = ""
+        nice_res = "您想要查询：#{@keyword}\n" +
+          "----------------\n" +
+          "结果:\n" +
+          "翻译：#{result["translation"].first}\n" +
+          "----------\n" +
+          "字典：\n"
+        result["basic"]["explains"].each do |r|
+          nice_res += "\t - #{r}\n"
         end
 
-        nice_res += "\n"
-      end
+        nice_res += "----------\n"
+        nice_res += "发音：\n"
+        nice_res += "\t - us: #{result["basic"]["us-phonetic"]}\n"
+        nice_res += "\t - uk: #{result["basic"]["uk-phonetic"]}\n"
+
+        nice_res += "----------\n"
+        nice_res += "网络：\n"
+        result["web"].each do |item|
+          nice_res += " #{item["key"]}：\n"
+          nice_res += "\t"
+          item["value"].each do |r|
+            nice_res += "#{r} "
+          end
+
+          nice_res += "\n"
+        end
 
       nice_res
+      end
     end
+
 
     def response_text_message(options={})
       result = find_result(@keyword)
-      reply_text_message(format_result(result))
+      if result
+        if is_chinese?(@keyword)
+          reply_text_message("It's chinese")
+        else
+          reply_text_message(format_eng_result(result))
+        end
+      else
+        reply_text_message("你在说什么~我怎么看不懂~")
+      end
     end
 
     # <Location_X>23.134521</Location_X>
